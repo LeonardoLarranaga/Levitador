@@ -1,6 +1,10 @@
 opencv-python
 numpy
-pip
 scipy
 pyserial
 imutils
+time
+kivy
+kivymd
+matplotlib
+kivy_garden.matplotlib

@@ -1,0 +1,117 @@
+<MyBoxLayout>:
+    orientation: 'vertical'
+    padding: [10,20,10,20]
+    spacing: 5
+
+    BoxLayout:
+        orientation: 'horizontal'
+        size_hint_y: 0.05
+        spacing: 5
+
+        MySpinner:
+            id: mi_spinner
+            text: app.options[0]
+            values: app.options
+            size_hint_x: 0.6
+            on_text: app.on_spinner_select(self.text)
+
+        MyButton:
+            text: 'Refrescar'
+            on_press: app.update_ports()
+            size_hint_x: 0.2
+
+        MyButton:
+            id: conect_desconect_button
+            text: 'Conectar'
+            on_press: app.on_conect_desconect_port()
+            size_hint_x: 0.2
+
+        
+            
+    BoxLayout:
+        orientation: 'horizontal'
+        size_hint_y: 0.7
+
+        FloatLayout: 
+            size_hint_x: 0.45
+            
+            BoxLayout:
+                padding: [10, 10, 10, 10]
+                id: graph_container
+                size_hint: (1, 1) 
+                pos_hint: {"top": 1}
+
+            MyButton:
+                id: pause_play_button
+                text: "Pausa"
+                size_hint: (0.13, 0.07)  
+                pos_hint: {"x": 0.82, "y": 0.89}  
+                on_press: app.toggle_pause()
+            
+            MyButton:
+                text: "Limpiar"
+                size_hint: (0.15, 0.07)  
+                pos_hint: {"x": 0.66, "y": 0.89}  
+                on_press: app.clear_ploot()
+
+        Image:
+            id: image_display  
+            allow_stretch: True
+            keep_ratio: True
+            size_hint_x: 0.45
+        
+        Slider:
+            id: slider
+            min: 0
+            max: 100
+            value: 0
+            step: 0.01
+            orientation: 'vertical'
+            on_value: app.update_text_input(slider.value)
+            size_hint_x: 0.1
+            cursor_size: (50, 50)  # Tamaño del cursor
+            cursor_image: 'assets/balon.png'
+
+    TextInput:
+        id: text_input
+        text: str(slider.value)
+        on_text: app.update_slider(text_input.text)
+        size_hint_x: 0.25
+        size_hint_y: 0.05
+        pos_hint: {'center_x': 0.5}
+        halign: 'center' 
+        multiline: False
+        
+    MyButton:
+        text: 'Aceptar'
+        on_press: app.on_button_press()
+        size_hint_x: 0.25
+        size_hint_y: 0.05
+        pos_hint: {'center_x': 0.5}
+
+<MyButton@Button>:  
+    canvas.before:
+        Color:
+            rgba: 0.4098, 0.4098, 0.4098, 0.9
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [10, 10, 10, 10] 
+    
+    background_color: 0, 0, 0, 0
+
+    on_press:
+        self.canvas.before.children[0].rgba = 0.4098, 0.4098, 0.4098, 1 
+    on_release:
+        self.canvas.before.children[0].rgba = 0.4098, 0.4098, 0.4098, 0.9 
+
+<MySpinner@Spinner>:  
+    canvas.before:
+        Color:
+            rgba: 0.4098, 0.4098, 0.4098, 0.9  
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [10, 10, 10, 10]  # Radio de las esquinas
+
+    background_color: 0, 0, 0, 0
