@@ -1,13 +1,20 @@
 import imutils
 import time
 import cv2
-from imutils.video import VideoStream
-from scipy.spatial import distance
 import threading
+
+from kivy.clock import Clock
+
 from Serial import SerialController
 
+from imutils.video import VideoStream
+from scipy.spatial import distance
+
+def mid_point(point_a, point_b):
+    return (point_a[0] + point_b[0]) / 2.0, (point_a[1] + point_b[1]) / 2.0
+
 class VideoProcessor:
-    def __init__(self, ball_size=40, reference_pixel=(0, 0)):
+    def __init__(self, ball_size=40, reference_pixel=(0, 0), main_ui_instance=None):
         self.video_stream = VideoStream(src=0).start()
         time.sleep(2.0)  # Permitir que la cámara se caliente
 
@@ -22,6 +29,8 @@ class VideoProcessor:
         self.frame = None
 
         self.serialController = SerialController()
+        self.main_ui_instance = main_ui_instance
+        self.max_distance = None
 
         # Hilo para procesar video
         self.thread = threading.Thread(target=self.process_video)
@@ -29,23 +38,34 @@ class VideoProcessor:
         self.thread.start()
         self.connection = None
 
-    def mid_point(self, point_a, point_b):
-        return (point_a[0] + point_b[0]) / 2.0, (point_a[1] + point_b[1]) / 2.0
-
     def process_video(self):
+        cropped_x, cropped_y, cropped_width, cropped_height = 0, 0, 0, 0
         while True:
             original_frame = self.video_stream.read()
             if original_frame is None:
                 continue
 
-            # Procesamiento de la imagen
-            resized_frame = imutils.resize(original_frame, width=500)
-            clean_frame = original_frame.copy()
+            if cropped_width == 0:
+                frame_height, frame_width = original_frame.shape[:2]
+                cropped_x = int((frame_width - cropped_width) / 4)
+                cropped_y = 0
+                cropped_width = int(frame_width / 2)
+                cropped_height = frame_height
+
+            # Recorta el frame original según la región de interés
+            cropped_frame = original_frame[cropped_y:cropped_y + cropped_height, cropped_x:cropped_x + cropped_width]
+
+            # Crear una copia redimensionada del frame para el procesamiento
+            resized_frame = imutils.resize(cropped_frame, width=500)
+
+            clean_frame = cropped_frame.copy()
+
             gray = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
             gray = cv2.GaussianBlur(gray, (23, 23), 0)
 
             if self.first_frame is None:
                 self.first_frame = gray
+                self.reference_pixel = (int(resized_frame.shape[1] / 2), 0)
                 continue
 
             # Calcula la diferencia entre frames
@@ -56,15 +76,13 @@ class VideoProcessor:
             contours = cv2.findContours(threshold.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours = imutils.grab_contours(contours)
 
-            distances_to_reference = []
-
             for contour in contours:
                 if cv2.contourArea(contour) < 250:
                     continue
 
                 # Procesar el contorno
                 (x, y, width, height) = cv2.boundingRect(contour)
-                scale_factor = original_frame.shape[1] / resized_frame.shape[1]
+                scale_factor = cropped_frame.shape[1] / resized_frame.shape[1]
                 (x, y, width, height) = (int(x * scale_factor), int(y * scale_factor), int(width * scale_factor), int(height * scale_factor))
 
                 cv2.rectangle(clean_frame, (x, y), (x + width, y + height), (0, 255, 0), 2)
@@ -78,32 +96,33 @@ class VideoProcessor:
                 # Calcular la distancia
                 distance_to_reference = distance.euclidean((center_x, center_y), self.reference_pixel)
                 distance_to_reference /= self.pixels_per_metric * scale_factor
-                distances_to_reference.append(distance_to_reference)
+                self.main_ui_instance.distance = distance_to_reference
+                if self.connection:
+                    message = f"{distance_to_reference:.2f}\n"
+                    self.serialController.sendMessage(self.connection, message)
+
+                if self.max_distance is None and distance_to_reference is not None or distance_to_reference > self.max_distance:
+                    self.max_distance = distance_to_reference
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
+
+                    if self.connection:
+                        message = f"M{self.max_distance:.2f}\n"
+                        self.serialController.sendMessage(self.connection, message)
 
                 cv2.circle(clean_frame, (center_x, center_y), 5, self.blue_color, -1)
                 cv2.line(clean_frame, (center_x, center_y), self.reference_pixel, self.blue_color, 2)
-                mid_x, mid_y = self.mid_point((center_x, center_y), self.reference_pixel)
+                mid_x, mid_y = mid_point((center_x, center_y), self.reference_pixel)
                 cv2.putText(clean_frame, f"{distance_to_reference:.2f} mm", (int(mid_x), int(mid_y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.blue_color, 2)
 
             # Calcula y dibuja FPS
             current_time = time.time()
-            if (current_time - self.previous_time) != 0:
-                fps = 1 / (current_time - self.previous_time)
-                self.previous_time = current_time
-                fpsText = f"FPS: {fps:.2f}"
-                cv2.putText(clean_frame, fpsText, (original_frame.shape[1] - 200, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+            fps = 1 / (current_time - self.previous_time)
+            self.previous_time = current_time
 
-            # Envía los datos a la cola
-            self.frame = clean_frame
+            fpsText = f"FPS: {fps:.2f}"
+            cv2.putText(clean_frame, fpsText, (cropped_frame.shape[1] - 200, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
 
-            if self.connection:
-                message = "C" + str(distances_to_reference[0]) + "\n"
-                self.serialController.sendMessage(self.connection, message)
-            
-    def get_frame(self):
-        output = self.frame
-        self.frame = None
-        return output
+            self.main_ui_instance.frame = clean_frame
 
     def stop(self):
         self.video_stream.stop()

@@ -1,17 +1,19 @@
-import cv2
-import threading
 import time
-from kivy.uix.boxlayout import BoxLayout
-from kivymd.app import MDApp
+import os
+os.environ["KIVY_NO_CONSOLELOG"] = "1"
+import cv2
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from kivy.clock import Clock
+from kivy.core.window import Window
+from kivy.graphics.texture import Texture
+from kivy.properties import ListProperty, NumericProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy_garden.matplotlib import FigureCanvasKivyAgg
+from kivymd.app import MDApp
+
 from Camera import VideoProcessor
 from Serial import SerialController
-from kivy.core.window import Window
-from kivy.uix.boxlayout import BoxLayout
-from kivy.properties import ListProperty
-from kivy.graphics.texture import Texture
-import matplotlib.pyplot as plt
-from kivy_garden.matplotlib import FigureCanvasKivyAgg
 
 class MyBoxLayout(BoxLayout):
     pass
@@ -20,60 +22,93 @@ class MyApp(MDApp):
     options = ListProperty([])
     data_points = [] 
     time_points = [] 
-    max_data_points = 50
+    max_time_points = 10 # Y
+    max_data_points = 500 # X
     is_paused = False
-        
+    max_distance = NumericProperty(100)
+
     def build(self):
         self.theme_cls.primary_palette = "Blue"  
         self.theme_cls.accent_palette = "Amber"
         self.theme_cls.theme_style = "Light"
         Window.size = (900, 440) 
-        self.videoProcesor = VideoProcessor()
+        self.videoProcesor = VideoProcessor(main_ui_instance=self)
         self.serial = SerialController()
         self.options = self.serial.listPorts()
         self.port_selected = self.options[0]
         self.connection = None
+        self.title = "Levitador de Pelota"
+        self.frame = None
+        self.distance = None
 
-        return MyBoxLayout()
-    
+        layout = MyBoxLayout()
+        slider = layout.ids.slider
+        self.bind(max_distance=lambda instance, value: setattr(slider, 'max', value))
+        self.start_time = time.time()
+        return layout
+
+    def update_max_distance(self, new_max):
+        self.max_distance = new_max
+
     def on_start(self):
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvasKivyAgg(self.fig)
-        self.root.ids.graph_container.add_widget(self.canvas) 
+        self.root.ids.graph_container.add_widget(self.canvas)
 
         self.fig.patch.set_facecolor('lightgray')
         self.ax.set_facecolor('lightgray')
 
         # Inicializa la línea de datos
         self.line, = self.ax.plot([], [], linestyle='-')
-        
-        self.ax.set_ylim(0, 100)
-        self.ax.set_title('Real-time Data Plot')
-        self.ax.set_xlabel('Time (seconds)')
-        self.ax.set_ylabel('Value')
+
+        self.ax.set_ylim(0, 1000)
+        self.ax.set_title('Posición de la pelota')
+        self.ax.set_xlabel('Tiempo (s)')
+        self.ax.set_ylabel('Altura (mm)')
+        self.ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
         # Programa la actualización de la gráfica y la cámara
-        Clock.schedule_interval(self.update_frame, 1/500)
-        Clock.schedule_interval(self.update_graph, 1/100)
+        Clock.schedule_interval(self.update_frame, 1 / 500)
+        Clock.schedule_interval(self.update_graph, 1 / 100)
+
+        # Inicializar los datos con None hasta tener 100 puntos
+        self.data_points = [0]
+        self.time_points = [0]
+        self.start_time = time.time()
 
     def update_graph(self, dt):
-        if (not self.is_paused) and (self.connection):
-            value = self.serial.get_output()
+        if not self.is_paused:
+            current_value = self.distance
+            current_time = time.time() - self.start_time
 
-            if value:
-                current_value = float(value)
-                current_time = time.time() - self.start_time
-                
-                self.data_points.append(current_value)  
-                self.time_points.append(current_time)  
-                
-                if len(self.data_points) > self.max_data_points:
-                    self.data_points.pop(0)  
-                    self.time_points.pop(0)  
+            # Añadir el nuevo valor en el primer índice
+            self.data_points.append(current_value)
+            self.time_points.append(current_time)
 
-                self.line.set_data(self.time_points, self.data_points)
-                self.ax.set_xlim(min(self.time_points), max(self.time_points))
-                self.canvas.draw()
+            # Esté código hace lo siguiente:
+            # if len(self.data_points) > self.max_data_points:
+            #     self.data_points.pop(0)
+            #     self.time_points.pop(0)
+            if len(self.data_points) > self.max_data_points:
+                self.data_points.pop(0)
+                self.time_points.pop(0)
+
+            self.line.set_data(self.time_points, self.data_points)
+
+            # Ajustar límites del eje X
+            self.ax.set_xlim(min(self.time_points), max(self.time_points))
+
+            # Ajustar automáticamente el eje Y
+            self.ax.relim()
+            self.ax.autoscale_view()
+
+            valid_data = list(filter(None, self.data_points))
+            if valid_data:
+                self.ax.set_ylim(min(valid_data), max(valid_data))
+            else:
+                self.ax.set_ylim(0, self.max_data_points)
+
+            self.canvas.draw()
 
     def on_conect_desconect_port(self):
         if self.connection:
@@ -99,23 +134,16 @@ class MyApp(MDApp):
         self.options = self.serial.listPorts()
 
     def on_conect_port(self):
-        self.connection = self.serial.connectPort(self.port_selected, 9600)
+        self.connection = self.serial.connectPort(self.port_selected, 115200)
         self.videoProcesor.connection = self.connection
         if self.connection:
-            self.thread = threading.Thread(target=self.serial.readMessage, args=(self.connection,))
-            self.thread.daemon = True 
-            self.start_time = time.time()
-            self.thread.start()
             button = self.root.ids.conect_desconect_button
             button.text = "Desconectar"
-        else: 
-            print("No se pudo")  
 
     def on_desconect_port(self):
         if self.connection and self.connection.is_open:
             self.serial.closePort(self.connection)
-            self.thread.join()  
-            self.connection = None  
+            self.connection = None
             button = self.root.ids.conect_desconect_button
             button.text = "Conectar"  
         else:
@@ -125,12 +153,9 @@ class MyApp(MDApp):
         self.port_selected = value
 
     def update_frame(self, dt):
-        frame = self.videoProcesor.get_frame()
 
-        if not frame is None:
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
+        if not self.frame is None:
+            frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
             frame = cv2.flip(frame, 0)
 
             # Crea un Texture a partir del frame
@@ -158,11 +183,10 @@ class MyApp(MDApp):
 
     def on_button_press(self):
         if self.connection:
-            message = "R" + str(self.root.ids.slider.value) + "\n"
-
+            message = f"R{self.root.ids.slider.value:.2f}\n"
             self.reference_value = self.root.ids.slider.value
-            self.reference_points = [self.reference_value] * self.max_data_points
-            x_line = list(range(1, self.max_data_points + 1))
+            self.reference_points = [self.reference_value] * self.max_time_points
+            x_line = list(range(1, self.max_time_points + 1))
 
             if hasattr(self, 'reference_line'):
                 self.reference_line.remove()
@@ -174,3 +198,5 @@ class MyApp(MDApp):
             self.serial.sendMessage(self.connection, message)
 
        
+if __name__ == "__main__":
+    MyApp().run()

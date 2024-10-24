@@ -63,7 +63,7 @@
         Slider:
             id: slider
             min: 0
-            max: 100
+            max: app.max_distance
             value: 0
             step: 0.01
             orientation: 'vertical'
@@ -115,3 +115,9 @@
             radius: [10, 10, 10, 10]  # Radio de las esquinas
 
     background_color: 0, 0, 0, 0
+
+<Imagen_Button@Button>:
+    size_hint: None, None
+    size: 200, 100
+    background_normal: 'path/to/your/image.png'
+    background_down: 'path/to/your/image_pressed.png'
