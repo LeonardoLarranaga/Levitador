@@ -1,6 +1,6 @@
 import time
 import os
-os.environ["KIVY_NO_CONSOLELOG"] = "1"
+#os.environ["KIVY_NO_CONSOLELOG"] = "1"
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -11,9 +11,13 @@ from kivy.properties import ListProperty, NumericProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy_garden.matplotlib import FigureCanvasKivyAgg
 from kivymd.app import MDApp
-
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.image import Image
 from Camera import VideoProcessor
 from Serial import SerialController
+
+class ImageButton(ButtonBehavior, Image):
+    pass
 
 class MyBoxLayout(BoxLayout):
     pass
@@ -194,8 +198,11 @@ class MyApp(MDApp):
             self.reference_line, = self.ax.plot(x_line, self.reference_points, linestyle='--', color='red', label='Referencia')
             self.canvas.draw()
 
-            print(message)
             self.serial.sendMessage(self.connection, message)
+
+    def on_refresh_videoProcesor(self):
+        self.videoProcesor.first_frame = None
+        self.videoProcesor.pixels_per_metric = None            
 
        
 if __name__ == "__main__":

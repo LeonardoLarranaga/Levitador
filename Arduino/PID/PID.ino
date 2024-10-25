@@ -12,6 +12,10 @@ float P, I, D, PID;
 float errorSum = 0.0;
 
 unsigned long initialTime = 0;
+
+unsigned long currentTime = 0, prevTime = 0;
+float deltaTime = 0.0;
+
 float previousError;
 bool reset = false;
 
@@ -25,14 +29,17 @@ void setup() {
 }
 
 void loop() {
+  currentTime = millis();
+  deltaTime = (currentTime - prevTime) / 1000.0;
   if (Serial.available() > 0) readFromSerial();
   computePID();
   OCR1A = pwmValue;
+  prevTime = currentTime;
 }
 
 void computePID() {
   float error = distance - reference;
-  float derivativeError = error - previousError;
+  float derivativeError = (error - previousError) / deltaTime;
 
   P = Kp * error;
   D = Kd * derivativeError;
@@ -49,7 +56,7 @@ void computePID() {
     }
   } else if (abs(error) < (0.019 * reference)) reset = false;
 
-  errorSum += error;
+  errorSum += error * deltaTime;
   previousError = error;
 
   I = Ki * errorSum;
