@@ -15,7 +15,7 @@ def mid_point(point_a, point_b):
 
 class VideoProcessor:
     def __init__(self, ball_size=40, reference_pixel=(0, 0), main_ui_instance=None):
-        self.video_stream = VideoStream(src=0).start()
+        self.video_stream = VideoStream(src=1).start()
         time.sleep(2.0)  # Permitir que la cámara se caliente
 
         self.ball_size = ball_size  # Tamaño de la pelota en mm
@@ -116,7 +116,11 @@ class VideoProcessor:
 
             # Calcula y dibuja FPS
             current_time = time.time()
-            fps = 1 / (current_time - self.previous_time)
+            time_difference = current_time - self.previous_time
+            if time_difference == 0: 
+                fps = 1 / (time_difference)
+            else:
+                fps = 0
             self.previous_time = current_time
 
             fpsText = f"FPS: {fps:.2f}"

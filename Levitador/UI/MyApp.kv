@@ -23,11 +23,10 @@
         MyButton:
             id: conect_desconect_button
             text: 'Conectar'
-            on_press: app.on_conect_desconect_port()
+            on_press: app.on_refresh_videoProcesor()
             size_hint_x: 0.2
 
         
-            
     BoxLayout:
         orientation: 'horizontal'
         size_hint_y: 0.7
@@ -54,11 +53,12 @@
                 pos_hint: {"x": 0.66, "y": 0.89}  
                 on_press: app.clear_ploot()
 
-        Image:
-            id: image_display  
+        ImageButton:
+            id: image_display
+            size_hint_x: 0.45
             allow_stretch: True
             keep_ratio: True
-            size_hint_x: 0.45
+            on_release: app.on_refresh_videoProcesor()
         
         Slider:
             id: slider
