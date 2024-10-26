@@ -1,6 +1,7 @@
+import threading
 import time
 import os
-#os.environ["KIVY_NO_CONSOLELOG"] = "1"
+# os.environ["KIVY_NO_CONSOLELOG"] = "1"
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -30,12 +31,10 @@ class MyApp(MDApp):
     max_data_points = 500 # X
     is_paused = False
     max_distance = NumericProperty(100)
+    min_distance = NumericProperty(0)
 
     def build(self):
-        self.theme_cls.primary_palette = "Blue"  
-        self.theme_cls.accent_palette = "Amber"
-        self.theme_cls.theme_style = "Light"
-        Window.size = (900, 440) 
+        Window.size = (1200, 600)
         self.videoProcesor = VideoProcessor(main_ui_instance=self)
         self.serial = SerialController()
         self.options = self.serial.listPorts()
@@ -44,31 +43,36 @@ class MyApp(MDApp):
         self.title = "Levitador de Pelota"
         self.frame = None
         self.distance = None
+        self.reference_value = 0
 
         layout = MyBoxLayout()
         slider = layout.ids.slider
         self.bind(max_distance=lambda instance, value: setattr(slider, 'max', value))
+        self.bind(min_distance=lambda instance, value: setattr(slider, 'min', value))
         self.start_time = time.time()
         return layout
 
     def update_max_distance(self, new_max):
         self.max_distance = new_max
 
+    def update_min_distance(self, new_min):
+        self.min_distance = new_min
+
     def on_start(self):
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvasKivyAgg(self.fig)
         self.root.ids.graph_container.add_widget(self.canvas)
 
-        self.fig.patch.set_facecolor('lightgray')
-        self.ax.set_facecolor('lightgray')
+        self.fig.patch.set_facecolor('white')
+        self.ax.set_facecolor('white')
 
         # Inicializa la línea de datos
         self.line, = self.ax.plot([], [], linestyle='-')
 
         self.ax.set_ylim(0, 1000)
-        self.ax.set_title('Posición de la pelota')
-        self.ax.set_xlabel('Tiempo (s)')
-        self.ax.set_ylabel('Altura (mm)')
+        self.ax.set_title('Posición de la pelota', fontsize=22, fontweight='heavy')
+        self.ax.set_xlabel('Tiempo (s)', fontsize=18, fontweight='bold')
+        self.ax.set_ylabel('Altura (mm)', fontsize=18, fontweight='bold')
         self.ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
         # Programa la actualización de la gráfica y la cámara
@@ -89,36 +93,39 @@ class MyApp(MDApp):
             self.data_points.append(current_value)
             self.time_points.append(current_time)
 
-            # Esté código hace lo siguiente:
-            # if len(self.data_points) > self.max_data_points:
-            #     self.data_points.pop(0)
-            #     self.time_points.pop(0)
+            # Mantener el tamaño máximo de los puntos
             if len(self.data_points) > self.max_data_points:
                 self.data_points.pop(0)
                 self.time_points.pop(0)
 
+            # Actualizar los datos del gráfico principal
             self.line.set_data(self.time_points, self.data_points)
 
-            # Ajustar límites del eje X
+            # Ajustar los límites del eje X
             self.ax.set_xlim(min(self.time_points), max(self.time_points))
 
-            # Ajustar automáticamente el eje Y
+            # Ajustar automáticamente los límites del eje Y
             self.ax.relim()
             self.ax.autoscale_view()
 
-            valid_data = list(filter(None, self.data_points))
-            if valid_data:
-                self.ax.set_ylim(min(valid_data), max(valid_data))
-            else:
-                self.ax.set_ylim(0, self.max_data_points)
+            # Asegurarse de que la referencia tenga la misma longitud que los datos
+            self.reference_points = [self.reference_value] * len(self.time_points)
 
+            # Actualizar o crear la línea de referencia
+            if hasattr(self, 'reference_line'):
+                self.reference_line.set_data(self.time_points, self.reference_points)
+            else:
+                self.reference_line, = self.ax.plot(self.time_points, self.reference_points, linestyle='--',
+                                                    color='red', label='Referencia')
+
+            # Redibujar la gráfica
             self.canvas.draw()
 
-    def on_conect_desconect_port(self):
+    def on_connect_disconnect_port(self):
         if self.connection:
             self.on_desconect_port()
         else:
-            self.on_conect_port()
+            self.on_connect_port()
 
     def toggle_pause(self):
         self.is_paused = not self.is_paused
@@ -128,7 +135,7 @@ class MyApp(MDApp):
         else:
             button.text = "Pausa"
     
-    def clear_ploot(self):
+    def clear_plot(self):
         self.data_points.clear()
         self.time_points.clear()
         self.line.set_data(self.time_points, self.data_points)
@@ -137,9 +144,12 @@ class MyApp(MDApp):
     def update_ports(self):
         self.options = self.serial.listPorts()
 
-    def on_conect_port(self):
+    def on_connect_port(self):
         self.connection = self.serial.connectPort(self.port_selected, 115200)
         self.videoProcesor.connection = self.connection
+        self.read_thread = threading.Thread(target=self.serial.readMessage, args=(self.connection,))
+        self.read_thread.daemon = True
+        self.read_thread.start()
         if self.connection:
             button = self.root.ids.conect_desconect_button
             button.text = "Desconectar"
@@ -157,7 +167,6 @@ class MyApp(MDApp):
         self.port_selected = value
 
     def update_frame(self, dt):
-
         if not self.frame is None:
             frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
             frame = cv2.flip(frame, 0)

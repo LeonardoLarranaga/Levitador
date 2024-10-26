@@ -50,11 +50,11 @@ class SerialController:
 
     def readMessage(self, connection):
         """Lee mensajes del puerto serial y los pasa directamente a la gráfica."""
-        while True:
+        while connection:
             if connection.in_waiting > 0:
                 message = connection.readline().decode(errors='ignore').strip()
                 if message:
-                    self.output = message
+                    print(message)
 
     def closePort(self, connection):
         try:

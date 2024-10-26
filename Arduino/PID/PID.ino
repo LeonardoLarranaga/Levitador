@@ -1,12 +1,15 @@
 const uint8_t pwmPin = 9; // PWM pin para el Timer 1
-int pwmValue = 0;
+long pwmValue = 0;
+const long maxPWMValue = 65535;
+const long pwmToLift = 18000;
 
-const float Kp = 2.0;
-const float Ki = 0.5;
-const float Kd = 0.2;
+const float Kp = 1.8;
+const float Ki = 0.4;
+const float Kd = 1.1;
 
 float distance = 0.0;
 float reference = 0.0;
+float maxDistance = 0.0;
 
 float P, I, D, PID;
 float errorSum = 0.0;
@@ -22,10 +25,17 @@ bool reset = false;
 void setup() {
   Serial.begin(115200);
   pinMode(pwmPin, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   // Configurar Timer 1 para operar en modo Fast PWM de 16 bits
   TCCR1A = _BV(COM1A1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
   ICR1 = 0xFFFF;
+
+  // Timer en máximo por 3 segundos, para que se obtenga una medición en Python...
+  OCR1A = pwmToLift;
+  delay(3000);  // Espera de 3 segundos
+
+  OCR1A = 0;
 }
 
 void loop() {
@@ -44,17 +54,17 @@ void computePID() {
   P = Kp * error;
   D = Kd * derivativeError;
 
-  if (abs(error) > (0.015 * reference)) {
-    if (reset) {
-      if (millis() - initialTime > 3000) {
-        errorSum /= 5.0;
-        reset = false;
-      }
-    } else {
-      reset = true;
-      initialTime = millis();
-    }
-  } else if (abs(error) < (0.019 * reference)) reset = false;
+  // if (abs(error) > (0.015 * reference)) {
+  //   if (reset) {
+  //     if (millis() - initialTime > 3000) {
+  //       errorSum /= 5.0;
+  //       reset = false;
+  //     }
+  //   } else {
+  //     reset = true;
+  //     initialTime = millis();
+  //   }
+  // } else if (abs(error) < (0.019 * reference)) reset = false;
 
   errorSum += error * deltaTime;
   previousError = error;
@@ -62,7 +72,11 @@ void computePID() {
   I = Ki * errorSum;
 
   PID = P + I + D;
-  PID = constrain(PID, 0, 65535);
+  PID *= -1;
+  PID = constrain(PID, -maxPWMValue, maxPWMValue);
+  PID = map(PID, -maxPWMValue, maxPWMValue, 10000.0, maxPWMValue);
+  Serial.print("PID: ");
+  Serial.println(PID);
   pwmValue = PID;
 }
 
@@ -70,7 +84,13 @@ void readFromSerial() {
   String read = Serial.readStringUntil('\n');
   if (read[0] == 'R') {
     reference = read.substring(1).toFloat();
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    Serial.print("Reference: ");
+    Serial.println(reference);
   } else {
     distance = read.toFloat();
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    // Serial.print("Distance: ");
+    // Serial.println(distance);
   }
 }

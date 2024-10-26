@@ -15,7 +15,7 @@ def mid_point(point_a, point_b):
 
 class VideoProcessor:
     def __init__(self, ball_size=40, reference_pixel=(0, 0), main_ui_instance=None):
-        self.video_stream = VideoStream(src=1).start()
+        self.video_stream = VideoStream(src=0).start()
         time.sleep(2.0)  # Permitir que la cámara se caliente
 
         self.ball_size = ball_size  # Tamaño de la pelota en mm
@@ -27,10 +27,12 @@ class VideoProcessor:
 
         # Cola para enviar datos
         self.frame = None
+        self.fps_imutils = None
 
         self.serialController = SerialController()
         self.main_ui_instance = main_ui_instance
         self.max_distance = None
+        self.min_distance = None
 
         # Hilo para procesar video
         self.thread = threading.Thread(target=self.process_video)
@@ -42,6 +44,7 @@ class VideoProcessor:
         cropped_x, cropped_y, cropped_width, cropped_height = 0, 0, 0, 0
         while True:
             original_frame = self.video_stream.read()
+
             if original_frame is None:
                 continue
 
@@ -49,7 +52,7 @@ class VideoProcessor:
                 frame_height, frame_width = original_frame.shape[:2]
                 cropped_x = int((frame_width - cropped_width) / 4)
                 cropped_y = 0
-                cropped_width = int(frame_width / 2)
+                cropped_width = int(frame_width / 1.8)
                 cropped_height = frame_height
 
             # Recorta el frame original según la región de interés
@@ -61,11 +64,11 @@ class VideoProcessor:
             clean_frame = cropped_frame.copy()
 
             gray = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (23, 23), 0)
+            gray = cv2.GaussianBlur(gray, (7, 7), 0)
 
             if self.first_frame is None:
                 self.first_frame = gray
-                self.reference_pixel = (int(resized_frame.shape[1] / 2), 0)
+                self.reference_pixel = (int(cropped_frame.shape[1] / 2), cropped_frame.shape[0])
                 continue
 
             # Calcula la diferencia entre frames
@@ -76,9 +79,13 @@ class VideoProcessor:
             contours = cv2.findContours(threshold.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contours = imutils.grab_contours(contours)
 
+            found_valid_contour = False
+
             for contour in contours:
-                if cv2.contourArea(contour) < 250:
+                if cv2.contourArea(contour) < 250 or cv2.contourArea(contour) > 5000:
                     continue
+
+                found_valid_contour = True
 
                 # Procesar el contorno
                 (x, y, width, height) = cv2.boundingRect(contour)
@@ -97,17 +104,17 @@ class VideoProcessor:
                 distance_to_reference = distance.euclidean((center_x, center_y), self.reference_pixel)
                 distance_to_reference /= self.pixels_per_metric * scale_factor
                 self.main_ui_instance.distance = distance_to_reference
-                if self.connection:
-                    message = f"{distance_to_reference:.2f}\n"
-                    self.serialController.sendMessage(self.connection, message)
-
                 if self.max_distance is None and distance_to_reference is not None or distance_to_reference > self.max_distance:
                     self.max_distance = distance_to_reference
                     Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
 
-                    if self.connection:
-                        message = f"M{self.max_distance:.2f}\n"
-                        self.serialController.sendMessage(self.connection, message)
+                if self.min_distance is None and distance_to_reference is not None or distance_to_reference < self.min_distance:
+                    self.min_distance = distance_to_reference
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
+
+                if self.connection:
+                    message = f"{distance_to_reference:.2f}\n"
+                    self.serialController.sendMessage(self.connection, message)
 
                 cv2.circle(clean_frame, (center_x, center_y), 5, self.blue_color, -1)
                 cv2.line(clean_frame, (center_x, center_y), self.reference_pixel, self.blue_color, 2)
@@ -117,16 +124,17 @@ class VideoProcessor:
             # Calcula y dibuja FPS
             current_time = time.time()
             time_difference = current_time - self.previous_time
-            if time_difference == 0: 
-                fps = 1 / (time_difference)
-            else:
-                fps = 0
+            fps = 1 / time_difference
             self.previous_time = current_time
 
             fpsText = f"FPS: {fps:.2f}"
-            cv2.putText(clean_frame, fpsText, (cropped_frame.shape[1] - 200, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+            cv2.putText(clean_frame, fpsText, (cropped_frame.shape[1] - 200, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (255, 255, 255), 2)
 
             self.main_ui_instance.frame = clean_frame
+
+            if not found_valid_contour and self.connection:
+                self.serialController.sendMessage(self.connection, f"0.0\n")
+                self.main_ui_instance.distance = 0
 
     def stop(self):
         self.video_stream.stop()

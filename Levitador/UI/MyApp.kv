@@ -1,123 +1,201 @@
 <MyBoxLayout>:
     orientation: 'vertical'
     padding: [10,20,10,20]
-    spacing: 5
+
+    canvas.before:
+        Color:
+            rgb: 242/255.0, 243/255.0, 245/255.0
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    Label:
+        size_hint_y: None
+        height: 10
 
     BoxLayout:
-        orientation: 'horizontal'
-        size_hint_y: 0.05
+        orientation: 'vertical'
+        padding: [20, 0, 20, 0]
         spacing: 5
 
-        MySpinner:
-            id: mi_spinner
-            text: app.options[0]
-            values: app.options
-            size_hint_x: 0.6
-            on_text: app.on_spinner_select(self.text)
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            background_color: 1, 1, 1, 1
+            height: 65
+            minimum_height: 65
+            spacing: 12
+            padding: [20, 10, 20, 10]
 
-        MyButton:
-            text: 'Refrescar'
-            on_press: app.update_ports()
-            size_hint_x: 0.2
+            canvas.before:
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [12]
 
-        MyButton:
-            id: conect_desconect_button
-            text: 'Conectar'
-            on_press: app.on_refresh_videoProcesor()
-            size_hint_x: 0.2
+            Label:
+                text: "[b]Elegir Puerto:[/b]"
+                markup: True
+                size_hint_x: 0.13
+                halign: 'left'
+                valign: 'middle'
+                color: 0, 0, 0, 1
 
-        
-    BoxLayout:
-        orientation: 'horizontal'
-        size_hint_y: 0.7
+            MySpinner:
+                id: mi_spinner
+                text: app.options[0]
+                values: app.options
+                size_hint_x: 0.6
+                on_text: app.on_spinner_select(self.text)
+                color: 0, 0, 0, 1
 
-        FloatLayout: 
-            size_hint_x: 0.45
-            
+                canvas.before:
+                    Color:
+                        rgba: 1, 1, 1, 1
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [10]
+
+                canvas.after:
+                    Color:
+                        rgb: 196/255.0, 196/255.0, 196/255.0
+                    Line:
+                        width: 1.2
+                        rounded_rectangle: (self.x, self.y, self.width, self.height, 10)
+
+            MyButton:
+                text: 'Refrescar'
+                on_press: app.update_ports()
+                size_hint_x: 0.2
+
+            MyButton:
+                id: conect_desconect_button
+                text: 'Conectar'
+                on_press: app.on_connect_disconnect_port()
+                size_hint_x: 0.2
+
+        Label:
+            size_hint_y: None
+            height: 20
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.7
+            size_hint_x: 1
+
+            FloatLayout:
+                size_hint_x: 0.45
+
+                BoxLayout:
+                    padding: [0, 7, 0, 0]
+                    id: graph_container
+                    size_hint: (1, 1)
+                    pos_hint: {"top": 1, "x": 0.005}
+
+                    canvas.before:
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [12]
+
+                MyButton:
+                    id: pause_play_button
+                    text: "Pausa"
+                    size_hint: (0.13, 0.07)
+                    pos_hint: {"x": 0.85, "y": 0.91}
+                    on_press: app.toggle_pause()
+
+                MyButton:
+                    text: "Limpiar"
+                    size_hint: (0.15, 0.07)
+                    pos_hint: {"x": 0.69, "y": 0.91}
+                    on_press: app.clear_plot()
+
+            ImageButton:
+                id: image_display
+                size_hint_x: 0.45
+                allow_stretch: True
+                keep_ratio: True
+                on_release: app.on_refresh_videoProcesor()
+
+            Label:
+                size_hint_x: None
+                width: 15
+
             BoxLayout:
-                padding: [10, 10, 10, 10]
-                id: graph_container
-                size_hint: (1, 1) 
-                pos_hint: {"top": 1}
+                orientation: 'vertical'
+                size_hint_y: 1
+                size_hint_x: None
+                spacing: 10
 
-            MyButton:
-                id: pause_play_button
-                text: "Pausa"
-                size_hint: (0.13, 0.07)  
-                pos_hint: {"x": 0.82, "y": 0.89}  
-                on_press: app.toggle_pause()
-            
-            MyButton:
-                text: "Limpiar"
-                size_hint: (0.15, 0.07)  
-                pos_hint: {"x": 0.66, "y": 0.89}  
-                on_press: app.clear_ploot()
+                Slider:
+                    id: slider
+                    min: app.min_distance
+                    max: app.max_distance
+                    value: 0
+                    step: 0.01
+                    orientation: 'vertical'
+                    on_value:
+                        app.update_text_input(slider.value)
+                    size_hint_x: 1
+                    cursor_size: (110, 110)
+                    cursor_image: 'assets/ping-pong-ball.png'
 
-        ImageButton:
-            id: image_display
-            size_hint_x: 0.45
-            allow_stretch: True
-            keep_ratio: True
-            on_release: app.on_refresh_videoProcesor()
-        
-        Slider:
-            id: slider
-            min: 0
-            max: app.max_distance
-            value: 0
-            step: 0.01
-            orientation: 'vertical'
-            on_value: app.update_text_input(slider.value)
-            size_hint_x: 0.1
-            cursor_size: (50, 50)  # Tamaño del cursor
-            cursor_image: 'assets/balon.png'
+                TextInput:
+                    id: text_input
+                    text: str(slider.value)
+                    on_text: app.update_slider(text_input.text)
+                    size_hint_x: None
+                    width: 155
+                    pos_hint: {'x': -0.37}
+                    size_hint_y: 0.05
+                    halign: 'center'
+                    multiline: False
 
-    TextInput:
-        id: text_input
-        text: str(slider.value)
-        on_text: app.update_slider(text_input.text)
-        size_hint_x: 0.25
-        size_hint_y: 0.05
-        pos_hint: {'center_x': 0.5}
-        halign: 'center' 
-        multiline: False
-        
-    MyButton:
-        text: 'Aceptar'
-        on_press: app.on_button_press()
-        size_hint_x: 0.25
-        size_hint_y: 0.05
-        pos_hint: {'center_x': 0.5}
+                MyButton:
+                    text: 'Enviar'
+                    on_press: app.on_button_press()
+                    size_hint_x: None
+                    width: 155
+                    size_hint_y: 0.05
+                    pos_hint: {'x': -0.37}
 
-<MyButton@Button>:  
+<MySpinner@Spinner>:
+    background_normal: ''
+    background_color: 1, 1, 1, 1
+    color: 0, 0, 0, 1
+
     canvas.before:
         Color:
-            rgba: 0.4098, 0.4098, 0.4098, 0.9
+            rgba: 1, 1, 1, 1
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [10, 10, 10, 10] 
-    
-    background_color: 0, 0, 0, 0
+            radius: [12]
 
-    on_press:
-        self.canvas.before.children[0].rgba = 0.4098, 0.4098, 0.4098, 1 
-    on_release:
-        self.canvas.before.children[0].rgba = 0.4098, 0.4098, 0.4098, 0.9 
+<SpinnerOption>:
+    background_normal: ''
+    background_color: 242/255.0, 243/255.0, 245/255.0
+    color: 0, 0, 0, 1
+    height: 55
 
-<MySpinner@Spinner>:  
+<MyButton@Button>:
+    background_normal: ''
+    pressed: False
+    color: 0, 0, 0, 1
+
     canvas.before:
         Color:
-            rgba: 0.4098, 0.4098, 0.4098, 0.9  
+            rgba: (1, 1, 1, 1)
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [10, 10, 10, 10]  # Radio de las esquinas
+            radius: [10]
 
-    background_color: 0, 0, 0, 0
-
-<Imagen_Button@Button>:
-    size_hint: None, None
-    size: 200, 100
-    background_normal: 'path/to/your/image.png'
-    background_down: 'path/to/your/image_pressed.png'
+    canvas.after:
+        Color:
+            rgb: 196/255.0, 196/255.0, 196/255.0
+        Line:
+            width: 1.2
+            rounded_rectangle: (self.x, self.y, self.width, self.height, 10)

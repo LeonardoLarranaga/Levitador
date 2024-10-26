@@ -8,3 +8,4 @@ kivy
 kivymd
 matplotlib
 kivy_garden.matplotlib
+setuptools

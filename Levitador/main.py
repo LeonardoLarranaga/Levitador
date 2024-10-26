@@ -35,7 +35,7 @@ while True:
     gray = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
 
     # Aplica desenfoque para reducir el ruido
-    gray = cv2.GaussianBlur(gray, (23, 23), 0)
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
     # Inicializa el primer frame si no se ha hecho
     if first_frame is None:
@@ -46,7 +46,7 @@ while True:
     frame_delta = cv2.absdiff(first_frame, gray)
 
     # Aplica umbral
-    threshold = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+    threshold = cv2.threshold(frame_delta, 21, 255, cv2.THRESH_BINARY)[1]
     threshold = cv2.dilate(threshold, None, iterations=2)
 
     # Encuentra contornos en la imagen con umbral
@@ -55,8 +55,12 @@ while True:
 
     # Bucle sobre los contornos
     for contour in contours:
-        if cv2.contourArea(contour) < 230:
+        if cv2.contourArea(contour) < 150:
+            print("Área del contorno muy pequeña.")
+            print(cv2.contourArea(contour))
             continue
+
+        print(f"Área del contorno: {cv2.contourArea(contour)}")
 
         # Calcula el cuadro delimitador del contorno sobre el frame redimensionado
         (x, y, width, height) = cv2.boundingRect(contour)
@@ -99,9 +103,9 @@ while True:
     cv2.imshow("Levitador de Pelota", clean_frame)
 
     # cv2.moveWindow("Levitador de Pelota", 50, 0)
-    # cv2.imshow("Umbral", threshold)
+    cv2.imshow("Umbral", threshold)
     # cv2.moveWindow("Umbral", 1010, 0)
-    # cv2.imshow("Diferencia de frames", frame_delta)
+    cv2.imshow("Diferencia de frames", frame_delta)
     # cv2.moveWindow("Diferencia de frames", 1010, 310)
 
     # Si se presiona la tecla 'q', sal del bucle, si se presiona la tecla 'r', reinicia el primer frame
