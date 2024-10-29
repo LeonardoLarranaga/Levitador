@@ -1,7 +1,7 @@
 import threading
 import time
 import os
-# os.environ["KIVY_NO_CONSOLELOG"] = "1"
+os.environ["KIVY_NO_CONSOLELOG"] = "1"
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -105,8 +105,7 @@ class MyApp(MDApp):
             self.ax.set_xlim(min(self.time_points), max(self.time_points))
 
             # Ajustar automáticamente los límites del eje Y
-            self.ax.relim()
-            self.ax.autoscale_view()
+            self.ax.set_ylim(0, self.max_distance + 10)
 
             # Asegurarse de que la referencia tenga la misma longitud que los datos
             self.reference_points = [self.reference_value] * len(self.time_points)
@@ -116,14 +115,14 @@ class MyApp(MDApp):
                 self.reference_line.set_data(self.time_points, self.reference_points)
             else:
                 self.reference_line, = self.ax.plot(self.time_points, self.reference_points, linestyle='--',
-                                                    color='red', label='Referencia')
+                                                    color='red', label='Referencia', linewidth=2)
 
             # Redibujar la gráfica
             self.canvas.draw()
 
     def on_connect_disconnect_port(self):
         if self.connection:
-            self.on_desconect_port()
+            self.on_disconnect_port()
         else:
             self.on_connect_port()
 
@@ -154,11 +153,13 @@ class MyApp(MDApp):
             button = self.root.ids.conect_desconect_button
             button.text = "Desconectar"
 
-    def on_desconect_port(self):
+    def on_disconnect_port(self):
         if self.connection and self.connection.is_open:
             self.serial.closePort(self.connection)
             self.connection = None
             button = self.root.ids.conect_desconect_button
+            self.root.ids.slider.value = 0
+            self.reference_value = 0
             button.text = "Conectar"  
         else:
             print("No hay ninguna conexión activa.")
@@ -197,6 +198,7 @@ class MyApp(MDApp):
     def on_button_press(self):
         if self.connection:
             message = f"R{self.root.ids.slider.value:.2f}\n"
+            self.serial.sendMessage(self.connection, message)
             self.reference_value = self.root.ids.slider.value
             self.reference_points = [self.reference_value] * self.max_time_points
             x_line = list(range(1, self.max_time_points + 1))
@@ -204,10 +206,8 @@ class MyApp(MDApp):
             if hasattr(self, 'reference_line'):
                 self.reference_line.remove()
 
-            self.reference_line, = self.ax.plot(x_line, self.reference_points, linestyle='--', color='red', label='Referencia')
+            self.reference_line, = self.ax.plot(x_line, self.reference_points, linestyle='--', color='red', label='Referencia', linewidth=2)
             self.canvas.draw()
-
-            self.serial.sendMessage(self.connection, message)
 
     def on_refresh_videoProcesor(self):
         self.videoProcesor.first_frame = None

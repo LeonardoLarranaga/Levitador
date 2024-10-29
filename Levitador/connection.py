@@ -41,7 +41,7 @@ def connect_port(com_port, baud_rate):
         return None
 
 def send_message(connection, message):
-    if not connection:
+    if not connection.is_open:
         return
     try:
         if message.lower() == "exit":

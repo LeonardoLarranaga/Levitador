@@ -42,7 +42,10 @@ class VideoProcessor:
 
     def process_video(self):
         cropped_x, cropped_y, cropped_width, cropped_height = 0, 0, 0, 0
+        previousMillis = 0
+        distance_to_reference = 0
         while True:
+            currentMillis = time.time()
             original_frame = self.video_stream.read()
 
             if original_frame is None:
@@ -64,7 +67,7 @@ class VideoProcessor:
             clean_frame = cropped_frame.copy()
 
             gray = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (7, 7), 0)
+            gray = cv2.GaussianBlur(gray, (33, 33), 0)
 
             if self.first_frame is None:
                 self.first_frame = gray
@@ -73,7 +76,7 @@ class VideoProcessor:
 
             # Calcula la diferencia entre frames
             frame_delta = cv2.absdiff(self.first_frame, gray)
-            threshold = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+            threshold = cv2.threshold(frame_delta, 22, 255, cv2.THRESH_BINARY)[1]
             threshold = cv2.dilate(threshold, None, iterations=2)
 
             contours = cv2.findContours(threshold.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -82,7 +85,13 @@ class VideoProcessor:
             found_valid_contour = False
 
             for contour in contours:
-                if cv2.contourArea(contour) < 250 or cv2.contourArea(contour) > 5000:
+                area = cv2.contourArea(contour)
+
+                # Calcular el rectángulo delimitador del contorno
+                x, y, w, h = cv2.boundingRect(contour)
+
+                # Definir límites de área y altura
+                if area < 250 or area > 5000 or h < 30 or w < 50:
                     continue
 
                 found_valid_contour = True
@@ -107,14 +116,22 @@ class VideoProcessor:
                 if self.max_distance is None and distance_to_reference is not None or distance_to_reference > self.max_distance:
                     self.max_distance = distance_to_reference
                     Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
+                elif not self.connection:
+                    self.max_distance = 0
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
 
                 if self.min_distance is None and distance_to_reference is not None or distance_to_reference < self.min_distance:
                     self.min_distance = distance_to_reference
                     Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
 
-                if self.connection:
+                    if not self.connection:
+                        self.min_distance = 0
+                        Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
+
+                if self.connection and currentMillis - previousMillis > 0.015:
                     message = f"{distance_to_reference:.2f}\n"
                     self.serialController.sendMessage(self.connection, message)
+                    previousMillis = currentMillis
 
                 cv2.circle(clean_frame, (center_x, center_y), 5, self.blue_color, -1)
                 cv2.line(clean_frame, (center_x, center_y), self.reference_pixel, self.blue_color, 2)
@@ -132,9 +149,10 @@ class VideoProcessor:
 
             self.main_ui_instance.frame = clean_frame
 
-            if not found_valid_contour and self.connection:
-                self.serialController.sendMessage(self.connection, f"0.0\n")
+            if not found_valid_contour and self.connection and distance_to_reference < self.max_distance * 0.2:
+                self.serialController.sendMessage(self.connection, "0.0\n")
                 self.main_ui_instance.distance = 0
+
 
     def stop(self):
         self.video_stream.stop()
