@@ -1,7 +1,4 @@
-import threading
 import time
-import os
-os.environ["KIVY_NO_CONSOLELOG"] = "1"
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -146,9 +143,6 @@ class MyApp(MDApp):
     def on_connect_port(self):
         self.connection = self.serial.connectPort(self.port_selected, 115200)
         self.videoProcesor.connection = self.connection
-        self.read_thread = threading.Thread(target=self.serial.readMessage, args=(self.connection,))
-        self.read_thread.daemon = True
-        self.read_thread.start()
         if self.connection:
             button = self.root.ids.conect_desconect_button
             button.text = "Desconectar"

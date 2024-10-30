@@ -1,11 +1,11 @@
 const uint8_t pwmPin = 9;  // PWM pin para el Timer 1
 float pwmValue = 0;
-const long maxPWMValue = 65535;
+const long maxPWMValue = 33000;
 const long pwmToLift = 18000;
 
-const float Kp = 0.5;
-const float Ki = 1;
-const float Kd = 3;
+const float Kp = 3;
+const float Ki = 0.5;
+const float Kd = 0.1;
 
 float distance = 0.0;
 float reference = 0.0;
@@ -36,8 +36,8 @@ void setup() {
 
 void loop() {
   if (Serial.available() > 0) readFromSerial();
-  computePID();
-  OCR1A = pwmValue;
+  
+  OCR1A = distance;
 }
 
 void computePID() {
@@ -55,18 +55,13 @@ void computePID() {
   PID = P + I + D;
   PID *= -1;
   PID = constrain(PID, 0, maxPWMValue);
-  pwmValue = mapFloat(PID, 0, maxPWMValue, 10000, maxPWMValue);
-
-  Serial.print(" PID: ");
-  Serial.println(pwmValue);
+  pwmValue = mapFloat(PID, 0, maxPWMValue, 20000, maxPWMValue);
 }
 
 void readFromSerial() {
   String read = Serial.readStringUntil('\n');
   if (read[0] == 'R') {
     reference = read.substring(1).toFloat();
-    Serial.print("Reference: ");
-    Serial.println(reference);
   } else {
     distance = read.toFloat();
   }
