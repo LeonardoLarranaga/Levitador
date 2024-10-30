@@ -15,7 +15,7 @@ def mid_point(point_a, point_b):
 
 class VideoProcessor:
     def __init__(self, ball_size=40, reference_pixel=(0, 0), main_ui_instance=None):
-        self.video_stream = VideoStream(src=1).start()
+        self.video_stream = VideoStream(src=0).start()
         time.sleep(2.0)  # Permitir que la cámara se caliente
 
         self.ball_size = ball_size  # Tamaño de la pelota en mm
@@ -39,6 +39,8 @@ class VideoProcessor:
         self.thread.daemon = True
         self.thread.start()
         self.connection = None
+        self.max_width, self.max_height, self.max_area = 150, 150, 300
+        self.min_width, self.min_height = 35, 35
 
     def process_video(self):
         cropped_x, cropped_y, cropped_width, cropped_height = 0, 0, 0, 0
@@ -86,10 +88,10 @@ class VideoProcessor:
                 area = cv2.contourArea(contour)
 
                 # Calcular el rectángulo delimitador del contorno
-                x, y, w, h = cv2.boundingRect(contour)
+                _, _, w, h = cv2.boundingRect(contour)
 
                 # Definir límites de área y altura
-                if area < 450:
+                if area < self.max_area or w < self.min_width or w > self.max_width or h < self.min_height or h > self.max_height:
                     continue
 
                 found_valid_contour = True
@@ -113,18 +115,11 @@ class VideoProcessor:
                 self.main_ui_instance.distance = distance_to_reference
                 if self.max_distance is None and distance_to_reference is not None or distance_to_reference > self.max_distance:
                     self.max_distance = distance_to_reference
-                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
-                elif not self.connection:
-                    self.max_distance = 0
-                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance)))
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance * 0.8)))
 
                 if self.min_distance is None and distance_to_reference is not None or distance_to_reference < self.min_distance:
                     self.min_distance = distance_to_reference
-                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
-
-                    if not self.connection:
-                        self.min_distance = 0
-                        Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance * 1.65)))
 
                 if self.connection:
                     message = f"{distance_to_reference:.2f}\n"

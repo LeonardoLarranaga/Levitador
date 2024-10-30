@@ -1,3 +1,4 @@
+import threading
 import time
 import cv2
 import matplotlib.pyplot as plt
@@ -102,7 +103,7 @@ class MyApp(MDApp):
             self.ax.set_xlim(min(self.time_points), max(self.time_points))
 
             # Ajustar automáticamente los límites del eje Y
-            self.ax.set_ylim(0, self.max_distance + 10)
+            self.ax.set_ylim(0, (self.max_distance * 1.25) + 10)
 
             # Asegurarse de que la referencia tenga la misma longitud que los datos
             self.reference_points = [self.reference_value] * len(self.time_points)
@@ -112,7 +113,7 @@ class MyApp(MDApp):
                 self.reference_line.set_data(self.time_points, self.reference_points)
             else:
                 self.reference_line, = self.ax.plot(self.time_points, self.reference_points, linestyle='--',
-                                                    color='red', label='Referencia', linewidth=2)
+                                                    color='red', label='Referencia', linewidth=3)
 
             # Redibujar la gráfica
             self.canvas.draw()
@@ -141,18 +142,29 @@ class MyApp(MDApp):
         self.options = self.serial.listPorts()
 
     def on_connect_port(self):
+        self.root.ids.conect_desconect_button.text = "..."
+        connection_thread = threading.Thread(target=self.connect_port_task)
+        connection_thread.daemon = True
+        connection_thread.start()
+
+    def connect_port_task(self):
         self.connection = self.serial.connectPort(self.port_selected, 115200)
         self.videoProcesor.connection = self.connection
+
         if self.connection:
-            button = self.root.ids.conect_desconect_button
-            button.text = "Desconectar"
+            self.read_thread = threading.Thread(target=self.serial.readMessage, args=(self.connection,))
+            self.read_thread.daemon = True
+            self.read_thread.start()
+
+            self.root.ids.conect_desconect_button.text = "Desconectar"
+        else:
+            self.root.ids.conect_desconect_button.text = "Conectar"
 
     def on_disconnect_port(self):
         if self.connection and self.connection.is_open:
             self.serial.closePort(self.connection)
             self.connection = None
             button = self.root.ids.conect_desconect_button
-            self.root.ids.slider.value = 0
             self.reference_value = 0
             button.text = "Conectar"  
         else:
@@ -189,7 +201,7 @@ class MyApp(MDApp):
         except ValueError:
             pass  
 
-    def on_button_press(self):
+    def on_send_button_press(self):
         if self.connection:
             message = f"R{self.root.ids.slider.value:.2f}\n"
             self.serial.sendMessage(self.connection, message)
@@ -200,7 +212,7 @@ class MyApp(MDApp):
             if hasattr(self, 'reference_line'):
                 self.reference_line.remove()
 
-            self.reference_line, = self.ax.plot(x_line, self.reference_points, linestyle='--', color='red', label='Referencia', linewidth=2)
+            self.reference_line, = self.ax.plot(x_line, self.reference_points, linestyle='--', color='red', label='Referencia', linewidth=3)
             self.canvas.draw()
 
     def on_refresh_videoProcesor(self):
