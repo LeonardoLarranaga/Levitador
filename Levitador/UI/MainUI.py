@@ -103,7 +103,7 @@ class MyApp(MDApp):
             self.ax.set_xlim(min(self.time_points), max(self.time_points))
 
             # Ajustar automáticamente los límites del eje Y
-            self.ax.set_ylim(0, (self.max_distance * 1.25) + 10)
+            self.ax.set_ylim(0, (self.max_distance * 1.3333) + 10)
 
             # Asegurarse de que la referencia tenga la misma longitud que los datos
             self.reference_points = [self.reference_value] * len(self.time_points)

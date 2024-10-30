@@ -1,11 +1,11 @@
 const uint8_t pwmPin = 9;  // PWM pin para el Timer 1
 float pwmValue = 0;
 const long maxPWMValue = 33000;
-const long pwmToLift = 18000;
+const long minPWMValue = 18000;
 
-const float Kp = 3;
+const float Kp = 2.6;
 const float Ki = 0.5;
-const float Kd = 0.1;
+const float Kd = 0.5;
 
 float distance = 0.0;
 float reference = 0.0;
@@ -31,13 +31,13 @@ void setup() {
   ICR1 = 0xFFFF;
 
   OCR1A = maxPWMValue;
-  delay(2000);
+  delay(3000);
 }
 
 void loop() {
   if (Serial.available() > 0) readFromSerial();
   computePID();
-  OCR1A = distance;
+  OCR1A = pwmValue;
 }
 
 void computePID() {
@@ -50,10 +50,13 @@ void computePID() {
   errorSum += deltaTime != 0 ? error * deltaTime : 0;
   previousError = error;
 
+  processAntiWindup(error);
+
   I = Ki * errorSum;
 
   PID = P + I + D;
   PID *= -1;
+  Serial.println(PID);
   PID = constrain(PID, 0, maxPWMValue);
   pwmValue = mapFloat(PID, 0, maxPWMValue, 20000, maxPWMValue);
 }
@@ -71,6 +74,23 @@ void readFromSerial() {
   previousTime = currentTime;
 }
 
+void processAntiWindup(float currentError) {
+  if (abs(currentError) > (0.1 * reference)) {
+    if (reset) {
+      if (millis() - antiWindupStart > 1000) {
+        errorSum *= distance < reference && errorSum < 0 ? 1.1 : 0.9;
+        reset = false;
+      }
+    } else {
+      reset = true;
+      antiWindupStart = millis();
+    }
+  } else {
+    reset = false;
+    antiWindupStart = millis();
+  }
+}
+
 float mapFloat(float value, float fromLow, float fromHigh, float toLow, float toHigh) {
-  return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow; 
+  return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
 }

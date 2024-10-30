@@ -39,7 +39,7 @@ class VideoProcessor:
         self.thread.daemon = True
         self.thread.start()
         self.connection = None
-        self.max_width, self.max_height, self.max_area = 150, 150, 300
+        self.max_width, self.max_height, self.max_area = 100, 100, 300
         self.min_width, self.min_height = 35, 35
 
     def process_video(self):
@@ -91,7 +91,7 @@ class VideoProcessor:
                 _, _, w, h = cv2.boundingRect(contour)
 
                 # Definir límites de área y altura
-                if area < self.max_area or w < self.min_width or w > self.max_width or h < self.min_height or h > self.max_height:
+                if area < self.max_area or w < self.min_width or w > self.max_width or h < self.min_height or h > self.max_height or x < 100:
                     continue
 
                 found_valid_contour = True
@@ -115,7 +115,7 @@ class VideoProcessor:
                 self.main_ui_instance.distance = distance_to_reference
                 if self.max_distance is None and distance_to_reference is not None or distance_to_reference > self.max_distance:
                     self.max_distance = distance_to_reference
-                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance * 0.8)))
+                    Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'max_distance', float(self.max_distance * 0.75)))
 
                 if self.min_distance is None and distance_to_reference is not None or distance_to_reference < self.min_distance:
                     self.min_distance = distance_to_reference
