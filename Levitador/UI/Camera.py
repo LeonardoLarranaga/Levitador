@@ -15,7 +15,7 @@ def mid_point(point_a, point_b):
 
 class VideoProcessor:
     def __init__(self, ball_size=40, reference_pixel=(0, 0), main_ui_instance=None):
-        self.video_stream = VideoStream(src=0).start()
+        self.video_stream = VideoStream(src=1).start()
         time.sleep(2.0)  # Permitir que la cámara se caliente
 
         self.ball_size = ball_size  # Tamaño de la pelota en mm
@@ -42,10 +42,8 @@ class VideoProcessor:
 
     def process_video(self):
         cropped_x, cropped_y, cropped_width, cropped_height = 0, 0, 0, 0
-        previousMillis = 0
         distance_to_reference = 0
         while True:
-            currentMillis = time.time()
             original_frame = self.video_stream.read()
 
             if original_frame is None:
@@ -91,7 +89,7 @@ class VideoProcessor:
                 x, y, w, h = cv2.boundingRect(contour)
 
                 # Definir límites de área y altura
-                if area < 250 or area > 5000 or h < 30 or w < 50:
+                if area < 450:
                     continue
 
                 found_valid_contour = True
@@ -128,10 +126,9 @@ class VideoProcessor:
                         self.min_distance = 0
                         Clock.schedule_once(lambda dt: setattr(self.main_ui_instance, 'min_distance', float(self.min_distance)))
 
-                if self.connection and currentMillis - previousMillis > 0.015:
+                if self.connection:
                     message = f"{distance_to_reference:.2f}\n"
                     self.serialController.sendMessage(self.connection, message)
-                    previousMillis = currentMillis
 
                 cv2.circle(clean_frame, (center_x, center_y), 5, self.blue_color, -1)
                 cv2.line(clean_frame, (center_x, center_y), self.reference_pixel, self.blue_color, 2)
